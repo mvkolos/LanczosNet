@@ -1,0 +1,3 @@
+[submodule "pygcn"]
+	path = pygcn
+	url = https://github.com/tkipf/pygcn.git
