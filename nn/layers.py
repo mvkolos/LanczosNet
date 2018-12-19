@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from torch import nn
 from torch.nn.parameter import Parameter
@@ -27,7 +28,6 @@ class SpectralConv(nn.Module):
         else:
             self.mlp = IdentityModule()
 
-        self.mlp = nn.Linear(k, k)
         self.W = Parameter(torch.Tensor(in_features*(len(short_scales) +
                                                      len(long_scales)), out_features))
         stdv = 1. / (in_features*(len(short_scales) + len(long_scales)))**0.5
@@ -64,10 +64,10 @@ class IdentityModule(nn.Module):
 
 
 class ExpKernel(nn.Module):
-    def __init__(self, X, layers=None, e=10):
+    def __init__(self, X, A, layers=None, e=10):
         super().__init__()
-        self.input_features = X
         self.mlp = []
+        self.A = Parameter(torch.Tensor(np.sign(A)))
         shape = X.shape[-1]
 
         if layers is not None:
@@ -89,4 +89,4 @@ class ExpKernel(nn.Module):
         norms_squares = (norms.expand(n, n) + norms.t().expand(n, n))
         distances_squared = torch.sqrt(1e-6 + norms_squares - 2 * Y.mm(Y.t()))
         A = torch.exp(-distances_squared/self.e)
-        return A
+        return torch.clamp(A*self.A, 0)
