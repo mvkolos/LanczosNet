@@ -27,7 +27,6 @@ class SpectralConv(nn.Module):
         else:
             self.mlp = IdentityModule()
 
-        self.mlp = nn.Linear(k, k)
         self.W = Parameter(torch.Tensor(in_features*(len(short_scales) +
                                                      len(long_scales)), out_features))
         stdv = 1. / (in_features*(len(short_scales) + len(long_scales)))**0.5
