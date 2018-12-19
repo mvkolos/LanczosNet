@@ -2,6 +2,7 @@ from numpy.linalg import qr, norm
 from scipy.linalg import eigh_tridiagonal
 import numpy as np
 from tqdm import tqdm
+import torch
 
 
 def lanczos_algorithm(S, k, eps=0, re_ortho_rate=10):
@@ -31,8 +32,8 @@ def lanczos_algorithm(S, k, eps=0, re_ortho_rate=10):
         q_prev = q
         q = z/b
 
-        if j % re_ortho_rate == 0:
-            Q = qr(Q)[0]
+#         if j % re_ortho_rate == 0:
+#             Q = qr(Q)[0]
 
     T = Q.T@S@Q
     return Q, T
@@ -46,13 +47,20 @@ def process_adjacency_matrix(A, k, make_S=True, ritz=True):
     ritz - use ritz decomposition (returns tridioganal T instead)
     '''
     if make_S:
-        D = np.diag(A.sum(0))
-        D = np.sqrt(np.linalg.inv(D))
-        S = np.array(D@A@D)
+        if type(A) == torch.Tensor:
+            D = torch.sqrt(A.sum(0)).reshape(-1, 1)
+            S = A / D / D.t()
+        else:
+            D = np.diag(A.sum(0))
+            D = np.sqrt(np.linalg.inv(D))
+            S = np.array(D@A@D)
     else:
         S = A.copy()
 
-    Q, T = lanczos_algorithm(S, k)
+    if type(A) == torch.Tensor:
+        Q, T = lanczos_algorithm(S.cpu().detach().numpy(), k)
+    else:
+        Q, T = lanczos_algorithm(S, k)
 
     if not ritz:
         return S, Q, T
