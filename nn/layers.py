@@ -1,18 +1,37 @@
 import torch
 from torch import nn
+from torch.nn.parameter import Parameter
 
 
 class SpectralConv(nn.Module):
-    def __init__(self, k, short_scales, long_scales):
+    def __init__(self, in_features, out_features, k, short_scales, long_scales,
+                 mlp_layers_number=3):
         super(SpectralConv, self).__init__()
         '''
+        in_features - number of in features
+        out_features - number of out features
         k - number of Ritz values, k<=n
         short_scales - scales for direct filters S^qX
         long_scales - scales of spectral filters VRV^T
+        mlp_layers_number - number of layers in R values transformation
         '''
         self.short_scales = short_scales
         self.long_scales = long_scales
+        self.mlp = []
+
+        for _ in range(mlp_layers_number):
+            self.mlp.append(nn.modules.Linear(k, k))
+            self.mlp.append(nn.modules.ReLU())
+        if len(self.mlp) > 0:
+            self.mlp = nn.Sequential(*self.mlp[:-1])
+        else:
+            self.mlp = IdentityModule()
+
         self.mlp = nn.Linear(k, k)
+        self.W = Parameter(torch.Tensor(in_features*(len(short_scales) +
+                                                     len(long_scales)), out_features))
+        stdv = 1. / (in_features*(len(short_scales) + len(long_scales)))**0.5
+        self.W.data.uniform_(-stdv, stdv)
 
     def forward(self, X, S, V, R):
         '''
@@ -36,7 +55,7 @@ class SpectralConv(nn.Module):
             Z = torch.mm(Z, Y)
             features.append(Z)
 
-        return torch.cat(features, 1)
+        return torch.mm(torch.cat(features, 1), self.W)
 
 
 class IdentityModule(nn.Module):
