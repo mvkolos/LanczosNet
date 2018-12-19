@@ -13,6 +13,14 @@ def parse_index_file(filename):
         index.append(int(line.strip()))
     return index
 
+def normalize(mx):
+    """Row-normalize sparse matrix"""
+    rowsum = np.array(mx.sum(1))
+    r_inv = np.power(rowsum, -1).flatten()
+    r_inv[np.isinf(r_inv)] = 0.
+    r_mat_inv = sp.diags(r_inv)
+    mx = r_mat_inv.dot(mx)
+    return mx
 
 def load_data(dataset_str, data_dir = 'data/datasets'):
     
@@ -46,6 +54,7 @@ def load_data(dataset_str, data_dir = 'data/datasets'):
                 objects.append(pkl.load(f))
 
     x, y, tx, ty, allx, ally, graph = tuple(objects)
+
     test_idx_reorder = parse_index_file("{}/ind.{}.test.index".format(data_dir, dataset_str))
     test_idx_range = np.sort(test_idx_reorder)
 
@@ -59,21 +68,26 @@ def load_data(dataset_str, data_dir = 'data/datasets'):
         ty_extended = np.zeros((len(test_idx_range_full), y.shape[1]))
         ty_extended[test_idx_range-min(test_idx_range), :] = ty
         ty = ty_extended
-
+ 
     features = sp.vstack((allx, tx)).tolil()
     features[test_idx_reorder, :] = features[test_idx_range, :]
     adj = nx.adjacency_matrix(nx.from_dict_of_lists(graph))
-
+    adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
+    adj = normalize(adj + sp.eye(adj.shape[0]))
+    
     labels = np.vstack((ally, ty))
+    
     labels[test_idx_reorder, :] = labels[test_idx_range, :]
-
+    
+    
     idx_test = test_idx_range.tolist()
     idx_train = range(len(y))
     idx_val = range(len(y), len(y)+500)
     
     features = torch.FloatTensor(np.array(features.todense()))
-    labels = torch.LongTensor(np.where(labels)[1])
 
+    labels = torch.LongTensor(np.argmax(labels,1))
+    
     idx_train = torch.LongTensor(idx_train)
     idx_val = torch.LongTensor(idx_val)
     idx_test = torch.LongTensor(idx_test)    
