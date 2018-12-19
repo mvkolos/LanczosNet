@@ -64,9 +64,14 @@ class IdentityModule(nn.Module):
 
 
 class ExpKernel(nn.Module):
-    def __init__(self, X, A, layers=None, e=10):
+    def __init__(self, X, A, layers=None, e=10, learn_embedding=False):
         super().__init__()
         self.mlp = []
+        if learn_embedding:
+            self.X = Parameter(X)
+        else:
+            self.X = X
+
         self.A = Parameter(torch.Tensor(np.sign(A)))
         shape = X.shape[-1]
 
@@ -83,10 +88,10 @@ class ExpKernel(nn.Module):
         self.e = e
 
     def forward(self, input):
-        Y = self.mlp(input)
+        Y = self.mlp(self.X)
         n = Y.size(0)
         norms = torch.sum(Y**2, dim=1, keepdim=True)
         norms_squares = (norms.expand(n, n) + norms.t().expand(n, n))
         distances_squared = torch.sqrt(1e-6 + norms_squares - 2 * Y.mm(Y.t()))
         A = torch.exp(-distances_squared/self.e)
-        return torch.clamp(A*self.A, 0)
+        return torch.clamp(A*self.A, 0, 10)
