@@ -10,6 +10,8 @@ def lanczos_algorithm(S, k, eps=0, re_ortho_rate=10):
     S - matrix
     k - number of columns < dim S
     re_ortho_rate - reorthogonalization every t steps
+    
+    returns: orthogonal basis in Krylov subspace
     '''
     n = S.shape[0]
     x = np.ones(n)
@@ -34,6 +36,61 @@ def lanczos_algorithm(S, k, eps=0, re_ortho_rate=10):
         if re_ortho_rate: 
             if j % re_ortho_rate == 0:
                 Q = qr(Q)[0]
+
+    T = Q.T@S@Q
+    return Q, T
+
+
+def lanczos_algorithm_rational(S, k, eps=0, sigma = 1.):
+    '''
+    S - matrix
+    k - number of columns < dim S
+    sigma - shift for inverse of S
+    
+    returns: orthogonal basis in rational Krylov subspace
+ 
+    '''
+    n = S.shape[0]
+    x = np.ones(n)
+
+    b = 0
+    a = 0
+    q_prev = np.zeros(n)
+    w_prev = np.zeros(n)
+    
+    q = x/norm(x)
+    w = x/norm(x)
+    
+    S_inv = np.linalg.inv(S+sigma*np.identity(n))
+    w = S_inv@w
+    
+    Q = np.zeros((n, k))
+    
+    for j in tqdm(range(k//2)):
+        Q[:, 2*j] = q 
+        Q[:, 2*j+1] = w
+        
+        z = S@q
+        t = S_inv@w
+  
+        v = q.T@z
+        u = w.T@t
+        
+        z = z - v*q - b*q_prev
+        t = t - u*w - a*w_prev
+        
+        b = norm(z)
+        a = norm(t)
+
+        if b < eps:
+            break
+
+        q_prev = q
+        w_prev=w
+        q = z/b
+        w = t/a
+        
+        Q = qr(Q)[0]
 
     T = Q.T@S@Q
     return Q, T
